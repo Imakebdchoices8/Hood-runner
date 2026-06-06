@@ -42,15 +42,14 @@
   #startBtn:hover { transform:translateY(2px); box-shadow:0 3px 0 #993d00; }
   #startBtn:active { transform:translateY(5px); box-shadow:none; }
 </style>
- 
 </head>
 <body>
 <div id="gameWrapper">
-  <audio id="bgMusic" loop autoplay>
-    <source src="Miguel.mp3" type="audio/mpeg">
+  <audio id="bgMusic" loop>
+    <source src="data:audio/wav;base64,UklGRiYAAABXQVZFZm10IBAAAAABAAEAQB8AAAB9AAACABAAZGF0YQIAAAAAAA==" type="audio/wav">
   </audio>
   <audio id="bossMusic" loop>
-    <source src="Von.mp3" type="audio/mpeg">
+    <source src="data:audio/wav;base64,UklGRiYAAABXQVZFZm10IBAAAAABAAEAQB8AAAB9AAACABAAZGF0YQIAAAAAAA==" type="audio/wav">
   </audio>
   <div id="hud">
     <div>SCORE: <span class="sv" id="scoreEl">0</span></div>
@@ -68,7 +67,7 @@
       <div>🔫 Ammo — Pick up to reload</div>
       <div>🍗 Fried Chicken — +150 pts</div>
       <div>🍇 Kool-Aid — Invincibility</div>
-      <div>🏎️ Charger — Speed throught the hood!</div>
+      <div>🏎️ Charger — Speed through the hood!</div>
       <div>🟫 Platforms — Jump on top!</div>
       <div class="neg">💀 Opps — Drains score</div>
       <div class="neg">👶 Child Support — Slows you</div>
@@ -84,11 +83,7 @@
   var C=document.getElementById('game');
   var ctx=C.getContext('2d');
   var W=800,H=420;
-
-  // Ground / platform constants
-  var FLOOR=360; // y where feet rest on main ground
-
-  // Game state
+  var FLOOR=360;
   var gs='menu';
   var score=0,hi=0,spd=4.5,fN=0,bgX=0;
   var P,items,parts,floats,bullets;
@@ -96,16 +91,15 @@
   var negFx=null,negT=0;
   var flash=null,flashT=0;
   var bgBuildings=[];
-  // Boss state
   var boss=null;
   var bossProjectiles=[];
   var bossSpawnTimer=0;
   var bossDefeated=false;
   var bossBaseHP=3;
-  var bossAppearCount=0; // increments each spawn within a run
-  var deathCause=null; // 'boss' | 'enemy' | 'other'
+  var bossAppearCount=0;
+  var deathCause=null;
+  var spawnTimer=0;
 
-  // ── INIT ─────────────────────────────────────────────
   function reset(){
     score=0; spd=4.5; fN=0; bgX=0;
     bossAppearCount=0;
@@ -115,6 +109,7 @@
     items=[]; parts=[]; floats=[]; bullets=[];
     bossProjectiles=[];
     boss=null; bossSpawnTimer=0; bossDefeated=false;
+    spawnTimer=0;
     bgBuildings=makeBgBuildings();
     P={
       x:80, y:FLOOR,
@@ -124,13 +119,11 @@
       ammo:0, rt:0,
       inCharger:false,
       jumpBuffer:0,
-      // platform riding
       platY:null
     };
     gs='playing';
   }
 
-  // helper: rounded rectangle
   function roundRect(ctx,x,y,width,height,radius,fill,stroke){
     if(typeof radius==='number') radius={tl:radius,tr:radius,br:radius,bl:radius};
     ctx.beginPath();
@@ -148,33 +141,29 @@
     if(stroke) ctx.stroke();
   }
 
-  // ── INPUT ─────────────────────────────────────────────
   document.addEventListener('keydown',function(e){
     if(e.code==='Space'||e.code==='ArrowUp'){e.preventDefault();doJump();}
     if(e.code==='KeyZ'||e.code==='KeyX'){e.preventDefault();shoot();}
   });
   C.addEventListener('click',doJump);
-  // Audio controls
   var audioEl=document.getElementById('bgMusic');
   var bossMusicEl=document.getElementById('bossMusic');
-  audioEl.volume=0.3; // Set volume to 30% so it doesn't overpower game
-  bossMusicEl.volume=0.3; // Same volume for boss music
+  audioEl.volume=0.3;
+  bossMusicEl.volume=0.3;
 
   document.getElementById('startBtn').addEventListener('click',function(){
     var ov=document.getElementById('overlay');
     ov.style.display='none';
-    ov.querySelector('h1').textContent='🥛 TYRONE\'S MILK RUN';
-    ov.querySelector('.sub').textContent='Bought the milk. Just gotta get home. Easy.';
     document.getElementById('finalScore').style.display='none';
     document.getElementById('startBtn').textContent='LET HIM COOK! 🥛';
-    bossMusicEl.pause(); // Make sure boss music is stopped
-    audioEl.play(); // Make sure music plays when game starts
+    bossMusicEl.pause();
+    audioEl.play();
     reset();
   });
 
   function doJump(){
     if(gs!=='playing') return;
-    if(!P.inCharger) P.jumpBuffer=6; // Allow jumping within 6 frames of leaving ground
+    if(!P.inCharger) P.jumpBuffer=6;
   }
 
   function shoot(){
@@ -185,27 +174,14 @@
   }
 
   function spawnBoss(){
-    boss={
-      x:W-120, y:FLOOR-80,
-      w:80, h:80,
-      health: bossBaseHP + bossAppearCount,
-      attackTimer:0,
-      attackPhase:0,
-      invulnTimer:0
-    };
+    boss={x:W-120, y:FLOOR-80, w:80, h:80, health: bossBaseHP + bossAppearCount, attackTimer:0, attackPhase:0, invulnTimer:0};
     bossAppearCount++;
     addFloat('👑 KING VON 👑',W/2-40,100);
     flash='#ff00ff'; flashT=30;
-    // Switch to boss music
     audioEl.pause();
     bossMusicEl.currentTime=0;
     var p = bossMusicEl.play();
-    if(p && typeof p.catch==='function'){
-      p.catch(function(){
-        // If playback blocked, resume on next user interaction
-        document.body.addEventListener('click',function once(){ bossMusicEl.play(); },{once:true});
-      });
-    }
+    if(p && typeof p.catch==='function') p.catch(function(){});
   }
 
   function bossDealDamage(){
@@ -220,93 +196,70 @@
       score+=2000;
       flash='#ffff00'; flashT=30;
       boss=null;
-      // Switch back to original music
       bossMusicEl.pause();
       audioEl.currentTime=0;
       var p2 = audioEl.play();
-      if(p2 && typeof p2.catch==='function'){
-        p2.catch(function(){ document.body.addEventListener('click',function once(){ audioEl.play(); },{once:true}); });
-      }
+      if(p2 && typeof p2.catch==='function') p2.catch(function(){});
     }
   }
 
-  // ── BACKGROUND: THE HOOD ─────────────────────────────
   function makeBgBuildings(){
     var arr=[];
     var x=0;
     while(x<W*3){
       var bw=60+Math.floor(Math.random()*80);
       var bh=80+Math.floor(Math.random()*160);
-      var type=Math.floor(Math.random()*4); // 0=apt,1=corner store,2=church,3=warehouse
-      arr.push({ox:x,w:bw,h:bh,type:type,
-        col:['#3e2723','#4e342e','#263238','#1a237e','#37474f'][Math.floor(Math.random()*5)]});
+      var type=Math.floor(Math.random()*4);
+      arr.push({ox:x,w:bw,h:bh,type:type,col:['#3e2723','#4e342e','#263238','#1a237e','#37474f'][Math.floor(Math.random()*5)]});
       x+=bw+4+Math.floor(Math.random()*20);
     }
     return arr;
   }
 
   function drawBg(){
-    // Night sky / dusk
     var sky=ctx.createLinearGradient(0,0,0,H);
     sky.addColorStop(0,'#0d0d1a');
     sky.addColorStop(0.6,'#1a0a2e');
     sky.addColorStop(1,'#2d1b0e');
     ctx.fillStyle=sky;
     ctx.fillRect(0,0,W,H);
-
-    // Stars
     ctx.fillStyle='rgba(255,255,255,0.6)';
-    // deterministic stars
     for(var s=0;s<40;s++){
       var sx=((s*173+bgX*.05)%(W+100)+W+100)%(W+100)-50;
       var sy=((s*97)%80)+10;
       var r=s%3===0?1.5:0.8;
       ctx.beginPath(); ctx.arc(sx,sy,r,0,Math.PI*2); ctx.fill();
     }
-
-    // Moon
     ctx.fillStyle='#fffde7';
     ctx.beginPath(); ctx.arc(680,55,22,0,Math.PI*2); ctx.fill();
     ctx.fillStyle='#1a0a2e';
     ctx.beginPath(); ctx.arc(672,50,18,0,Math.PI*2); ctx.fill();
-
-    // Far buildings (parallax layer 1 - slow)
     for(var i=0;i<bgBuildings.length;i++){
       var b=bgBuildings[i];
       var bx=((b.ox-bgX*0.15)%(W*3+200)+W*3+200)%(W*3+200)-200;
       if(bx>W+10) continue;
       drawBuilding(bx,b.w,b.h,b.type,b.col,0.55);
     }
-
-    // Mid buildings (parallax layer 2 - medium)
     for(var j=0;j<bgBuildings.length;j++){
       var b2=bgBuildings[j];
       var bx2=((b2.ox+500-bgX*0.35)%(W*3+200)+W*3+200)%(W*3+200)-200;
       if(bx2>W+10) continue;
       drawBuilding(bx2,b2.w*0.7,b2.h*0.8,b2.type,b2.col,0.75);
     }
-
-    // Ground sidewalk
     ctx.fillStyle='#424242';
     ctx.fillRect(0,FLOOR,W,H-FLOOR);
-    // Sidewalk cracks
     ctx.strokeStyle='#333'; ctx.lineWidth=1;
     for(var c=0;c<8;c++){
       var cx2=((c*110-bgX)%(W+120)+W+120)%(W+120)-20;
       ctx.beginPath(); ctx.moveTo(cx2,FLOOR); ctx.lineTo(cx2+15,FLOOR+20); ctx.stroke();
     }
-    // Curb
     ctx.fillStyle='#616161';
     ctx.fillRect(0,FLOOR,W,8);
-
-    // Street markings
     ctx.strokeStyle='rgba(255,220,0,0.3)'; ctx.lineWidth=3;
     ctx.setLineDash([30,20]);
     ctx.lineDashOffset=-(bgX%50);
     ctx.beginPath(); ctx.moveTo(0,FLOOR+30); ctx.lineTo(W,FLOOR+30); ctx.stroke();
     ctx.setLineDash([]);
-
-    // Street lamp posts (parallax close)
     for(var l=0;l<4;l++){
       var lx=((l*200-bgX*0.9)%(W+200)+W+200)%(W+200)-20;
       drawLamp(lx);
@@ -318,46 +271,38 @@
     ctx.globalAlpha=alpha;
     ctx.fillStyle=col;
     ctx.fillRect(x,by,bw,bh);
-
-    // Windows
     ctx.fillStyle='rgba(255,220,100,0.7)';
     var wRows=Math.floor(bh/20);
     var wCols=Math.floor(bw/16);
     for(var r=0;r<wRows;r++){
       for(var c=0;c<wCols;c++){
-        if(Math.sin(x*r+c*7)>0.1){ // random looking but deterministic
+        if(Math.sin(x*r+c*7)>0.1){
           ctx.fillRect(x+4+c*16,by+8+r*20,8,10);
         }
       }
     }
-
-    if(type===1){ // corner store sign
+    if(type===1){
       ctx.fillStyle='rgba(255,0,0,0.8)';
       ctx.fillRect(x+2,by+bh-22,bw-4,16);
       ctx.fillStyle='#fff'; ctx.font='bold 8px Arial'; ctx.globalAlpha=alpha;
       ctx.fillText('CORNER',x+4,by+bh-11);
     }
-    if(type===2){ // church cross
+    if(type===2){
       ctx.fillStyle='#fff';
       ctx.fillRect(x+bw/2-3,by-18,6,20);
       ctx.fillRect(x+bw/2-9,by-14,18,5);
     }
     ctx.globalAlpha=1;
-    // Building outline
     ctx.strokeStyle='rgba(0,0,0,0.5)'; ctx.lineWidth=1;
     ctx.strokeRect(x,by,bw,bh);
   }
 
   function drawLamp(x){
-    // Post
     ctx.fillStyle='#9e9e9e';
     ctx.fillRect(x,FLOOR-90,4,90);
-    // Arm
     ctx.fillRect(x-14,FLOOR-90,18,4);
-    // Light
     ctx.fillStyle='#fffde7';
     ctx.beginPath(); ctx.arc(x-14,FLOOR-90,7,0,Math.PI*2); ctx.fill();
-    // Glow
     var grd=ctx.createRadialGradient(x-14,FLOOR-90,2,x-14,FLOOR-90,40);
     grd.addColorStop(0,'rgba(255,245,150,0.25)');
     grd.addColorStop(1,'rgba(255,245,150,0)');
@@ -365,26 +310,19 @@
     ctx.beginPath(); ctx.arc(x-14,FLOOR-90,40,0,Math.PI*2); ctx.fill();
   }
 
-  // ── PLATFORM DRAWING ─────────────────────────────────
-  // Platforms are in items list with tag='platform'
-  // They have {x,y,w,h} where y is the TOP surface
   function drawPlatform(it){
     var x=it.x,y=it.y,pw=it.pw,ph=it.ph;
-    // Concrete ledge
     var grad=ctx.createLinearGradient(x,y,x,y+ph);
     grad.addColorStop(0,'#757575');
     grad.addColorStop(1,'#424242');
     ctx.fillStyle=grad;
     ctx.fillRect(x,y,pw,ph);
-    // Top highlight
     ctx.fillStyle='#9e9e9e';
     ctx.fillRect(x,y,pw,4);
-    // Brick pattern
     ctx.strokeStyle='rgba(0,0,0,0.3)'; ctx.lineWidth=1;
     for(var b=0;b<Math.floor(ph/12);b++){
       ctx.beginPath(); ctx.moveTo(x,y+b*12); ctx.lineTo(x+pw,y+b*12); ctx.stroke();
     }
-    // Graffiti tag
     if(pw>60){
       ctx.font='italic bold 9px Arial';
       ctx.fillStyle='rgba(255,100,100,0.7)';
@@ -392,34 +330,21 @@
     }
   }
 
-  // ── DRAW BOSS (King Von–inspired stylized portrait) ─────────────────────
   function drawBoss(){
     if(!boss) return;
     var cx=boss.x+boss.w/2, by=boss.y;
     var bob=Math.sin(fN*0.06)*4;
-
     ctx.save();
     if(boss.invulnTimer>0&&Math.floor(boss.invulnTimer/5)%2===0) ctx.globalAlpha=0.4;
-
-    // Ground shadow
     ctx.fillStyle='rgba(0,0,0,0.35)';
     ctx.beginPath(); ctx.ellipse(cx,FLOOR+6,66,10,0,0,Math.PI*2); ctx.fill();
-
-    // Torso - dark jacket/hoodie
     ctx.fillStyle='#0b0b0b';
     roundRect(ctx,cx-36,by+18+bob,72,66,8,true,false);
-    // inner tee
     ctx.fillStyle='#dcdcdc'; ctx.fillRect(cx-18,by+30+bob,36,32);
-
-    // Thick gold chain
     ctx.strokeStyle='#ffd700'; ctx.lineWidth=4;
     ctx.beginPath(); ctx.arc(cx,by+44+bob,20,0.25*Math.PI,0.75*Math.PI); ctx.stroke();
-
-    // Head (skin tone)
     ctx.fillStyle='#5a3a33';
     ctx.beginPath(); ctx.ellipse(cx,by+8+bob,28,30,0,0,Math.PI*2); ctx.fill();
-
-    // Hair - short locs / braids around crown
     ctx.fillStyle='#0b0b0b';
     for(var i=0;i<14;i++){
       var ang = -Math.PI/2 + (i/14)*Math.PI + (i%2?0.08:-0.06);
@@ -429,40 +354,27 @@
       ctx.lineTo(hx+Math.cos(ang-0.2)*6, hy+Math.sin(ang-0.2)*6);
       ctx.lineWidth=3; ctx.stroke();
     }
-
-    // Eyes
     ctx.fillStyle='#fff';
     ctx.beginPath(); ctx.ellipse(cx-9,by+6+bob,6,4,0,0,Math.PI*2); ctx.fill();
     ctx.beginPath(); ctx.ellipse(cx+9,by+6+bob,6,4,0,0,Math.PI*2); ctx.fill();
     ctx.fillStyle='#111';
     ctx.beginPath(); ctx.ellipse(cx-9,by+6+bob,2.5,2,0,0,Math.PI*2); ctx.fill();
     ctx.beginPath(); ctx.ellipse(cx+9,by+6+bob,2.5,2,0,0,Math.PI*2); ctx.fill();
-
-    // Small facial tattoos (stylized marks)
     ctx.strokeStyle='#111'; ctx.lineWidth=1.5;
     ctx.beginPath(); ctx.moveTo(cx-2,by+2+bob); ctx.lineTo(cx+6,by+6+bob); ctx.stroke();
     ctx.beginPath(); ctx.arc(cx-16,by+8+bob,1.8,0,Math.PI*2); ctx.fill();
-
-    // Nose
     ctx.strokeStyle='#3b2a24'; ctx.lineWidth=2;
     ctx.beginPath(); ctx.moveTo(cx,by+8+bob); ctx.quadraticCurveTo(cx+2,by+12+bob,cx,by+14+bob); ctx.stroke();
-
-    // Mouth / small goatee
     ctx.fillStyle='#2a1612';
     ctx.beginPath(); ctx.ellipse(cx,by+20+bob,12,6,0,0,Math.PI*2); ctx.fill();
-
-    // Left arm / gun (recoil while attacking)
     var recoil = (boss.attackTimer%10<3)? -6:0;
     ctx.fillStyle='#222';
     ctx.fillRect(cx+22+recoil,by+38+bob,30,8);
-
-    // Health bar
     var hpW=80;
     ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(cx-hpW/2,by-55+bob,hpW,10);
     ctx.fillStyle=boss.health>1?'#ff6600':'#ff0000';
     ctx.fillRect(cx-hpW/2,by-55+bob,hpW*(boss.health/3),10);
     ctx.strokeStyle='#fff'; ctx.lineWidth=1; ctx.strokeRect(cx-hpW/2,by-55+bob,hpW,10);
-
     ctx.restore();
   }
 
@@ -471,85 +383,57 @@
     if(p.inCharger){ drawCharger(p.x,p.y); return; }
     var cx=p.x+p.w/2;
     var top=p.y-p.h;
-
     ctx.save();
     if(p.invincible&&Math.floor(fN/5)%2===0) ctx.globalAlpha=0.35;
-
-    // Shadow (only on ground)
     if(p.y>=FLOOR-2){
       ctx.fillStyle='rgba(0,0,0,0.25)';
       ctx.beginPath(); ctx.ellipse(cx,FLOOR+5,16,4,0,0,Math.PI*2); ctx.fill();
     }
-
     var leg=Math.sin(p.rt*.38)*12;
-    // Legs (jeans)
     ctx.strokeStyle='#1565c0'; ctx.lineWidth=9; ctx.lineCap='round';
     ctx.beginPath(); ctx.moveTo(cx-4,top+36); ctx.lineTo(cx-10+leg,p.y); ctx.stroke();
     ctx.beginPath(); ctx.moveTo(cx+4,top+36); ctx.lineTo(cx+10-leg,p.y); ctx.stroke();
-    // Shoes
     ctx.fillStyle='#111';
     ctx.fillRect(cx-14+leg,p.y-5,14,6);
     ctx.fillRect(cx+2-leg,p.y-5,14,6);
-
-    // Body - white tee
     ctx.fillStyle='#eeeeee';
     ctx.fillRect(cx-14,top+14,28,22);
-
-    // Arms
     ctx.strokeStyle='#5d4037'; ctx.lineWidth=7;
     var arm=Math.sin(p.rt*.38+Math.PI)*14;
-
     if(p.ammo>0){
-      // Gun arm (right arm extended forward with gun)
       ctx.strokeStyle='#5d4037';
       ctx.beginPath(); ctx.moveTo(cx+12,top+18); ctx.lineTo(cx+24,top+22); ctx.stroke();
-      // Gun
       ctx.fillStyle='#222';
       ctx.fillRect(cx+20,top+17,16,7);
       ctx.fillRect(cx+22,top+24,6,5);
-      // Ammo indicator
       ctx.font='bold 10px Arial'; ctx.fillStyle='#ffcc00';
       ctx.fillText('🔫'+p.ammo,cx+8,top+10);
     } else {
       ctx.beginPath(); ctx.moveTo(cx+12,top+18); ctx.lineTo(cx+22,top+28-arm); ctx.stroke();
     }
-    // Left arm
     ctx.strokeStyle='#5d4037';
     ctx.beginPath(); ctx.moveTo(cx-12,top+18); ctx.lineTo(cx-22,top+28+arm); ctx.stroke();
-
-    // Milk jug (left hand)
     ctx.fillStyle='#fff'; ctx.fillRect(cx-30,top+26,10,13);
     ctx.font='8px Arial'; ctx.fillText('🥛',cx-32,top+38);
-
-    // Head
     ctx.fillStyle='#5d4037';
     ctx.beginPath(); ctx.arc(cx,top+10,15,0,Math.PI*2); ctx.fill();
-
-    // Durag / fitted hat
     ctx.fillStyle='#1a237e';
     ctx.fillRect(cx-16,top+1,32,8);
     ctx.fillRect(cx-11,top-12,22,13);
-    // Durag knot back
     ctx.fillStyle='#283593';
     ctx.fillRect(cx+10,top+8,8,14);
-
-    // Eyes
     ctx.fillStyle='#fff';
     ctx.beginPath(); ctx.arc(cx-5,top+9,3,0,Math.PI*2); ctx.fill();
     ctx.beginPath(); ctx.arc(cx+5,top+9,3,0,Math.PI*2); ctx.fill();
     ctx.fillStyle='#111';
     ctx.beginPath(); ctx.arc(cx-4,top+9,1.5,0,Math.PI*2); ctx.fill();
     ctx.beginPath(); ctx.arc(cx+5,top+9,1.5,0,Math.PI*2); ctx.fill();
-
-    // Expression
     ctx.strokeStyle='#333'; ctx.lineWidth=1.5;
     if(negFx==='childsupport'||negFx==='gentrification'){
       ctx.beginPath(); ctx.arc(cx,top+16,4,Math.PI+.4,Math.PI*2-.4); ctx.stroke();
     } else {
       ctx.beginPath(); ctx.arc(cx,top+14,4,.2,Math.PI-.2); ctx.stroke();
     }
-
-    // Invincibility aura
     if(p.invincible){
       ctx.strokeStyle='hsl('+(fN*10%360)+',100%,65%)';
       ctx.lineWidth=3;
@@ -561,46 +445,36 @@
   function drawCharger(px,py){
     var cx=px+45,by=py;
     ctx.save();
-    // Shadow
     ctx.fillStyle='rgba(0,0,0,0.3)';
     ctx.beginPath(); ctx.ellipse(cx,by+5,50,7,0,0,Math.PI*2); ctx.fill();
-    // Body
     ctx.fillStyle='#b71c1c';
     ctx.fillRect(cx-52,by-26,104,22);
-    // Roof
     ctx.beginPath();
     ctx.moveTo(cx-30,by-26); ctx.lineTo(cx-20,by-50);
     ctx.lineTo(cx+24,by-50); ctx.lineTo(cx+34,by-26);
     ctx.closePath(); ctx.fillStyle='#c62828'; ctx.fill();
-    // Windshield
     ctx.beginPath();
     ctx.moveTo(cx-14,by-27); ctx.lineTo(cx-6,by-48);
     ctx.lineTo(cx+22,by-48); ctx.lineTo(cx+28,by-27);
     ctx.closePath(); ctx.fillStyle='rgba(150,220,255,0.7)'; ctx.fill();
-    // Side window
     ctx.fillStyle='rgba(100,180,220,0.6)';
     ctx.fillRect(cx-30,by-46,11,17);
-    // Wheels
     [cx-32,cx+32].forEach(function(wx){
       ctx.fillStyle='#111'; ctx.beginPath(); ctx.arc(wx,by,14,0,Math.PI*2); ctx.fill();
       ctx.fillStyle='#888'; ctx.beginPath(); ctx.arc(wx,by,8,0,Math.PI*2); ctx.fill();
       ctx.fillStyle='#555'; ctx.beginPath(); ctx.arc(wx,by,3,0,Math.PI*2); ctx.fill();
     });
-    // Headlights
     ctx.fillStyle='#ffff88'; ctx.fillRect(cx+48,by-22,6,8);
     var hg=ctx.createRadialGradient(cx+58,by-18,0,cx+58,by-18,18);
     hg.addColorStop(0,'rgba(255,255,100,0.4)'); hg.addColorStop(1,'transparent');
     ctx.fillStyle=hg; ctx.beginPath(); ctx.arc(cx+58,by-18,18,0,Math.PI*2); ctx.fill();
-    // Taillights
     ctx.fillStyle='#ff1a1a'; ctx.fillRect(cx-56,by-22,6,8);
-    // Exhaust
     if(Math.floor(fN/3)%2===0){
       ctx.fillStyle='rgba(255,120,0,0.8)';
       ctx.beginPath(); ctx.moveTo(cx-54,by-16);
       ctx.lineTo(cx-70,by-10+Math.random()*5); ctx.lineTo(cx-54,by-8);
       ctx.closePath(); ctx.fill();
     }
-    // Fuel bar
     var fp=puT/300;
     ctx.fillStyle='rgba(0,0,0,0.6)'; ctx.fillRect(cx-30,by-65,60,9);
     ctx.fillStyle=fp>.3?'#ff9800':'#f44336';
@@ -611,11 +485,9 @@
     ctx.restore();
   }
 
-  // ── DRAW ITEMS ────────────────────────────────────────
   function drawItem(it){
     ctx.save();
     if(it.stunned) ctx.globalAlpha=.4+Math.abs(Math.sin(fN*.25))*.5;
-
     switch(it.tag){
       case 'platform': drawPlatform(it); break;
       case 'police':   drawPolice(it);   break;
@@ -623,7 +495,6 @@
       case 'neg':      drawNegCard(it);  break;
       case 'pickup':   drawPickup(it);   break;
     }
-
     if(it.stunned){
       ctx.globalAlpha=1;
       ctx.font='16px Arial'; ctx.textBaseline='bottom';
@@ -669,7 +540,6 @@
     ctx.beginPath(); ctx.moveTo(cx+11,top+18); ctx.lineTo(cx+21,top+28-ar2); ctx.stroke();
     ctx.fillStyle='#5d4037';
     ctx.beginPath(); ctx.arc(cx,top+10,13,0,Math.PI*2); ctx.fill();
-    // Bandana
     ctx.fillStyle='#b71c1c'; ctx.fillRect(cx-14,top+3,28,9); ctx.fillRect(cx-10,top-10,20,13);
     ctx.fillStyle='#fff';
     ctx.beginPath(); ctx.arc(cx-4,top+9,2.5,0,Math.PI*2); ctx.fill();
@@ -683,7 +553,6 @@
   function drawNegCard(it){
     var x=it.x,y=it.y-it.h;
     var emojis={childsupport:'👶',gentrification:'🏗️'};
-    var labels={childsupport:'CHILD\nSUPPORT',gentrification:'GENTRIFY'};
     ctx.fillStyle=it.kind==='childsupport'?'#fff9c4':'#90a4ae';
     ctx.fillRect(x,y,it.w,it.h);
     ctx.strokeStyle=it.kind==='childsupport'?'#f57f17':'#546e7a'; ctx.lineWidth=2;
@@ -699,7 +568,6 @@
   function drawPickup(it){
     var emojis={chicken:'🍗',watermelon:'🍉',koolaid:'🍇',charger:'🏎️',ammo:'🔫'};
     var em=emojis[it.kind]||'?';
-    // Glowing background for rarer items
     if(it.kind==='charger'||it.kind==='watermelon'){
       var grd=ctx.createRadialGradient(it.x+it.w/2,it.y-it.h/2,2,it.x+it.w/2,it.y-it.h/2,22);
       grd.addColorStop(0,it.kind==='charger'?'rgba(255,80,0,.45)':'rgba(0,255,100,.35)');
@@ -711,35 +579,29 @@
     ctx.textBaseline='alphabetic';
   }
 
-  // ── BULLETS ───────────────────────────────────────────
   function drawBullets(){
     for(var i=0;i<bullets.length;i++){
       var b=bullets[i];
       ctx.fillStyle='#ffcc00';
       ctx.beginPath(); ctx.arc(b.x,b.y,b.r,0,Math.PI*2); ctx.fill();
-      // Tracer
       ctx.fillStyle='rgba(255,200,0,0.3)';
       ctx.fillRect(b.x-16,b.y-2,16,4);
     }
-    // Boss projectiles (stylized tracer)
     for(var j=0;j<bossProjectiles.length;j++){
       var bp=bossProjectiles[j];
-      // tracer line
       ctx.strokeStyle='rgba(255,150,60,0.35)'; ctx.lineWidth=6;
       ctx.beginPath(); ctx.moveTo(bp.x-bp.vx*2,bp.y-bp.vy*2); ctx.lineTo(bp.x,bp.y); ctx.stroke();
-      // core
       ctx.fillStyle='#ff8844';
       ctx.beginPath(); ctx.ellipse(bp.x,bp.y,5,3,Math.atan2(bp.vy,bp.vx),0,Math.PI*2); ctx.fill();
     }
   }
 
-  // ── PARTICLES & FLOATS ────────────────────────────────
   function burst(x,y,color,n){
     for(var i=0;i<n;i++){
-      parts.push({x:x,y:y,vx:(Math.random()-.5)*7,vy:(Math.random()-.5)*7-1,
-        r:2+Math.random()*4,color:color,life:30+Math.random()*20,maxLife:50});
+      parts.push({x:x,y:y,vx:(Math.random()-.5)*7,vy:(Math.random()-.5)*7-1,r:2+Math.random()*4,color:color,life:30+Math.random()*20,maxLife:50});
     }
   }
+
   function addFloat(text,x,y,neg){
     floats.push({text:text,x:x,y:y,life:85,maxLife:85,neg:!!neg});
   }
@@ -753,6 +615,7 @@
     }
     ctx.globalAlpha=1;
   }
+
   function drawFloats(){
     for(var i=0;i<floats.length;i++){
       var f=floats[i];
@@ -765,7 +628,6 @@
     ctx.globalAlpha=1;
   }
 
-  // ── SCREEN FLASH ──────────────────────────────────────
   function drawFlash(){
     if(!flash||flashT<=0) return;
     ctx.globalAlpha=(flashT/22)*.5;
@@ -773,7 +635,6 @@
     ctx.globalAlpha=1;
   }
 
-  // ── HUD ───────────────────────────────────────────────
   function updateHUD(){
     document.getElementById('scoreEl').textContent=Math.floor(score);
     document.getElementById('hiEl').textContent=Math.floor(hi);
@@ -796,30 +657,213 @@
     el.textContent=pu; el.style.color=col;
   }
 
-  function drawHint(){
-    if(fN>240) return;
-    ctx.globalAlpha=Math.min(1,(240-fN)/70);
-    ctx.fillStyle='rgba(0,0,0,.6)'; ctx.fillRect(0,0,W,24);
-    ctx.fillStyle='#fff'; ctx.font='13px Arial';
-    ctx.fillText('SPACE/Click=Jump    Z/X=Shoot 9mm    Jump ON platforms!',10,17);
-    ctx.globalAlpha=1;
+  function boxCollide(ax,ay,aw,ah, bx,by,bw,bh){
+    return ax<bx+bw && ax+aw>bx && ay<by+bh && ay+ah>by;
   }
 
-  // ── SPAWN ─────────────────────────────────────────────
-  // Heavily weighted toward platforms + police, pickups are rare, powerups very rare
-  var SPAWN_W=[
-    ['platform',   35],
-    ['police',     25],
-    ['opps',        8],
-    ['chicken',     8],
-    ['ammo',        7],
-    ['childsupport',5],
-    ['koolaid',     4],
-    ['gentrification',4],
-    ['watermelon',  3],
-    ['charger',     1],
-  ];
+  function platLand(pl){
+    if(P.vy>=0 && P.x+P.w-4 > pl.x && P.x+4 < pl.x+pl.pw && P.y>=pl.y && P.y-P.vy<pl.y+4){
+      return pl.y;
+    }
+    return null;
+  }
+
+  function updateBullets(){
+    for(var i=bullets.length-1;i>=0;i--){
+      var b=bullets[i];
+      b.x+=b.vx; b.life--;
+      if(b.x>W||b.life<=0){ bullets.splice(i,1); continue; }
+      var hit=false;
+      for(var j=items.length-1;j>=0;j--){
+        var it=items[j];
+        if((it.tag==='police'||it.tag==='opps')&&!it.stunned){
+          if(b.x>it.x&&b.x<it.x+it.w&&b.y>it.y-it.h&&b.y<it.y){
+            it.stunned=true; it.stunTimer=200;
+            burst(it.x+18,it.y-24,'#ffcc00',10);
+            addFloat('HEADSHOT! 💥',it.x-10,it.y-60);
+            score+=50;
+            bullets.splice(i,1); hit=true; break;
+          }
+        }
+      }
+      if(hit) continue;
+      if(boss&&b.x>boss.x&&b.x<boss.x+boss.w&&b.y>boss.y&&b.y<boss.y+boss.h){
+        bossDealDamage();
+        bullets.splice(i,1);
+      }
+    }
+  }
+
+  function update(){
+    if(gs!=='playing') return;
+    fN++;
+    spd=4.5+Math.min(fN/1400,1)*8;
+    if(fN%500===0) spd=Math.min(13,spd+0.3);
+    var speedMul=P.inCharger?1.6:1;
+    bgX+=spd*speedMul;
+    var smul=P.inCharger?5:1;
+    if(boss) smul*=1.5;
+    if(negFx==='opps') score=Math.max(0,score-spd*.1);
+    else score+=smul*spd*.055;
+    if(score>hi) hi=score;
+
+    P.vy+=0.82;
+    P.y+=P.vy;
+    P.onGround=false;
+
+    for(var i=0;i<items.length;i++){
+      var it=items[i];
+      if(it.tag!=='platform') continue;
+      var surf=platLand(it);
+      if(surf!==null&&P.vy>=0){
+        P.y=surf;
+        P.vy=0;
+        P.onGround=true;
+        break;
+      }
+      if(P.vy<0 && P.x+P.w-4>it.x && P.x+4<it.x+it.pw && P.y-P.h<it.y+it.ph && P.y-P.h+4>it.y+it.ph){
+        P.vy=0;
+        P.y=it.y+it.ph+P.h;
+      }
+    }
+
+    if(P.jumpBuffer>0){
+      P.jumpBuffer--;
+      if(P.jumpBuffer===0 && P.onGround){
+        P.vy=-20;
+        P.onGround=false;
+      }
+    }
+
+    if(P.x<0) P.x=0;
+    if(P.x+P.w>W) P.x=W-P.w;
+    if(P.y>H+100){
+      gs='over';
+      var ov=document.getElementById('overlay');
+      ov.style.display='flex';
+      ov.querySelector('h1').textContent='GAME OVER';
+      ov.querySelector('.sub').textContent='You lost the milk! Score: '+Math.floor(score)+' | Best: '+Math.floor(hi);
+      document.getElementById('finalScore').style.display='none';
+      document.getElementById('startBtn').textContent='TRY AGAIN 🥛';
+    }
+
+    P.rt+=0.04;
+    updateBullets();
+
+    spawnTimer++;
+    if(spawnTimer>Math.max(20,100-fN/20)){
+      spawnItem();
+      spawnTimer=0;
+    }
+
+    if(fN>5000&&!boss&&!bossDefeated){
+      spawnBoss();
+    }
+
+    for(var j=items.length-1;j>=0;j--){
+      var item=items[j];
+      item.x-=spd*speedMul;
+      if(item.x+item.w<0){ items.splice(j,1); continue; }
+
+      if(item.stunned){
+        item.stunTimer--;
+        if(item.stunTimer<=0) item.stunned=false;
+      }
+
+      if(item.tag==='platform') continue;
+
+      if(boxCollide(P.x,P.y-P.h,P.w,P.h, item.x,item.y-item.h,item.w,item.h)){
+        if(item.tag==='pickup'){
+          if(item.kind==='chicken'){ score+=150; burst(item.x,item.y,'#ff9800',8); }
+          else if(item.kind==='watermelon'){ score+=500; burst(item.x,item.y,'#ff0000',15); }
+          else if(item.kind==='ammo'){ P.ammo+=5; burst(item.x,item.y,'#ffff00',6); }
+          else if(item.kind==='koolaid'){ powerup='koolaid'; puT=360; P.invincible=true; burst(item.x,item.y,'#cc00ff',12); }
+          else if(item.kind==='charger'){ powerup='charger'; puT=300; P.inCharger=true; P.x-=45; burst(item.x,item.y,'#ff6600',15); }
+          addFloat('+'+{chicken:150,watermelon:500,ammo:5,koolaid:0,charger:0}[item.kind],item.x,item.y-40);
+          items.splice(j,1);
+        } else if(item.tag==='neg'){
+          if(item.kind==='childsupport'){ negFx='childsupport'; negT=200; }
+          else if(item.kind==='gentrification'){ score/=2; addFloat('-50%',item.x,item.y-40); }
+          items.splice(j,1);
+        } else if((item.tag==='police'||item.tag==='opps')&&!item.stunned){
+          if(item.tag==='police'){ score=Math.max(0,score-100); deathCause='police'; }
+          else { negFx='opps'; negT=200; deathCause='opps'; }
+          gs='over';
+          var ov=document.getElementById('overlay');
+          ov.style.display='flex';
+          ov.querySelector('h1').textContent='GAME OVER';
+          ov.querySelector('.sub').textContent='You got caught! Score: '+Math.floor(score)+' | Best: '+Math.floor(hi);
+          document.getElementById('startBtn').textContent='TRY AGAIN 🥛';
+        }
+      }
+    }
+
+    if(powerup){
+      puT--;
+      if(puT<=0){
+        powerup=null;
+        if(P.inCharger){
+          P.inCharger=false;
+          P.x+=45;
+        } else if(P.invincible){
+          P.invincible=false;
+        }
+      }
+    }
+
+    if(negFx){
+      negT--;
+      if(negT<=0) negFx=null;
+    }
+
+    if(boss){
+      boss.attackTimer++;
+      boss.invulnTimer=Math.max(0,boss.invulnTimer-1);
+      if(boss.attackTimer%40===0){
+        for(var k=0;k<3;k++){
+          var ang=Math.PI/4 + k*Math.PI/6;
+          bossProjectiles.push({x:boss.x+40,y:boss.y+40,vx:Math.cos(ang)*5,vy:Math.sin(ang)*5});
+        }
+      }
+    }
+
+    for(var m=bossProjectiles.length-1;m>=0;m--){
+      var bp=bossProjectiles[m];
+      bp.x+=bp.vx; bp.y+=bp.vy;
+      if(bp.x<0||bp.x>W||bp.y<0||bp.y>H){
+        bossProjectiles.splice(m,1);
+        continue;
+      }
+      if(!P.invincible&&boxCollide(P.x,P.y-P.h,P.w,P.h, bp.x-5,bp.y-5,10,10)){
+        gs='over';
+        var ov=document.getElementById('overlay');
+        ov.style.display='flex';
+        ov.querySelector('h1').textContent='GAME OVER';
+        ov.querySelector('.sub').textContent='KING VON GOT YOU! Score: '+Math.floor(score)+' | Best: '+Math.floor(hi);
+        document.getElementById('startBtn').textContent='TRY AGAIN 🥛';
+      }
+    }
+
+    if(flashT>0) flashT--;
+    
+    for(var n=parts.length-1;n>=0;n--){
+      parts[n].x+=parts[n].vx;
+      parts[n].y+=parts[n].vy;
+      parts[n].life--;
+      if(parts[n].life<=0) parts.splice(n,1);
+    }
+
+    for(var o=floats.length-1;o>=0;o--){
+      floats[o].y-=1.5;
+      floats[o].life--;
+      if(floats[o].life<=0) floats.splice(o,1);
+    }
+  }
+
+  var SPAWN_W=[['platform',35],['police',25],['opps',8],['chicken',8],['ammo',7],['childsupport',5],['koolaid',4],['gentrification',4],['watermelon',3],['charger',1]];
   var SPAWN_TOT=SPAWN_W.reduce(function(a,b){return a+b[1];},0);
+  var lastPlatEnd=-999;
+  var lastPlatform=null;
 
   function pickKind(){
     var r=Math.random()*SPAWN_TOT,acc=0;
@@ -830,32 +874,24 @@
     return 'police';
   }
 
-  var lastPlatEnd=-999; // track where last platform ended (x-wise) to avoid stacking
-  var lastPlatform=null; // reference to most recently spawned platform for logical placement
-
   function spawnItem(){
     var kind=pickKind();
-    // During boss fights, reduce police/opps frequency
     if(boss && (kind==='police' || kind==='opps')){
       if(Math.random()<0.7){
-        // replace with platform or pickup to give player space
         kind = (Math.random()<0.5)?'platform':'chicken';
       }
     }
 
     if(kind==='platform'){
-      // More controlled platform placement: space from last end, varied heights
       var pw=70+Math.floor(Math.random()*100);
       var ph=18+Math.floor(Math.random()*16);
       var heights=[FLOOR-60, FLOOR-100, FLOOR-140];
       var py=heights[Math.floor(Math.random()*heights.length)];
-      // Ensure a minimum gap from previous platform
       var startX = Math.max(W+10, Math.floor(lastPlatEnd + 120 + Math.random()*80));
       var plat = {tag:'platform',kind:'platform', x:startX, y:py, pw:pw, ph:ph, w:pw, h:FLOOR-py+ph };
       items.push(plat);
       lastPlatEnd = startX + pw;
       lastPlatform = plat;
-      // Sometimes add a lower platform right after (step sequence), positioned relative to first
       if(Math.random()<0.3){
         var sx = startX + pw + 30 + Math.random()*40;
         var smallW = Math.floor(pw*0.6);
@@ -867,399 +903,47 @@
       return;
     }
 
-    // Enemies / pickups: placed on ground or on top of nearest platform
     var yy=FLOOR;
-    // Floatable pickups may appear above ground; prefer placing on the last platform when available
+    var sizes={police:{w:36,h:48},opps:{w:36,h:48},chicken:{w:36,h:32},ammo:{w:34,h:28},koolaid:{w:34,h:34},watermelon:{w:42,h:38},charger:{w:90,h:40},childsupport:{w:42,h:44},gentrification:{w:44,h:48}};
     if(kind==='chicken'||kind==='ammo'||kind==='koolaid'){
       if(lastPlatform && Math.random()<0.65){
-        // place on last platform near its center
         var px = Math.floor(lastPlatform.x + 8 + Math.random()*(Math.max(1,lastPlatform.pw-16)));
-        yy = lastPlatform.y - (sizes&&sizes[kind]?sizes[kind].h:32) - 4;
-        items.push({tag:'pickup',kind:kind, x:px, y:yy, w:(sizes&&sizes[kind]?sizes[kind].w:34), h:(sizes&&sizes[kind]?sizes[kind].h:34), stunned:false, stunTimer:0});
+        yy = lastPlatform.y - (sizes[kind]?sizes[kind].h:32) - 4;
+        items.push({tag:'pickup',kind:kind, x:px, y:yy, w:sizes[kind]?sizes[kind].w:34, h:sizes[kind]?sizes[kind].h:34, stunned:false, stunTimer:0});
         return;
       } else {
-        // Floating in air
         if(Math.random()>.5) yy=FLOOR-70-Math.random()*50;
       }
     }
-
-    var sizes={
-      police:{w:36,h:48},opps:{w:36,h:48},
-      chicken:{w:36,h:32},ammo:{w:34,h:28},
-      koolaid:{w:34,h:34},watermelon:{w:42,h:38},
-      charger:{w:90,h:40},
-      childsupport:{w:42,h:44},gentrification:{w:44,h:48}
-    };
     var sz=sizes[kind]||{w:36,h:36};
     var tag='pickup';
-    if(kind==='police'||kind==='opps') tag='police';
+    if(kind==='police') tag='police';
     else if(kind==='opps') tag='opps';
     else if(kind==='childsupport'||kind==='gentrification') tag='neg';
 
-    if(kind==='opps') tag='opps';
-
-    items.push({tag:tag,kind:kind,
-      x:W+10, y:yy,
-      w:sz.w, h:sz.h,
-      stunned:false, stunTimer:0
-    });
+    items.push({tag:tag,kind:kind, x:W+10, y:yy, w:sz.w, h:sz.h, stunned:false, stunTimer:0});
   }
 
-  // ── COLLISION ─────────────────────────────────────────
-  function boxCollide(ax,ay,aw,ah, bx,by,bw,bh){
-    return ax<bx+bw && ax+aw>bx && ay<by+bh && ay+ah>by;
-  }
-
-  // Platform collision: returns surface Y or null
-  function platLand(pl){
-    // Player box: x,y-h to y
-    var px=P.x+4, py=P.y-P.h, pw=P.w-8, ph=P.h;
-    var platTop=pl.y;
-    var platBot=pl.y+pl.ph;
-    // Feet were above platform top last frame, now at or below
-    if(P.vy>=0 &&
-       P.x+P.w-4 > pl.x && P.x+4 < pl.x+pl.pw &&
-       P.y>=platTop && P.y-P.vy<platTop+4){
-      return platTop;
-    }
-    return null;
-  }
-
-  // ── BULLET UPDATE ─────────────────────────────────────
-  function updateBullets(){
-    for(var i=bullets.length-1;i>=0;i--){
-      var b=bullets[i];
-      b.x+=b.vx; b.life--;
-      if(b.x>W||b.life<=0){ bullets.splice(i,1); continue; }
-      // Check hit on police/opps
-      var hit=false;
-      for(var j=items.length-1;j>=0;j--){
-        var it=items[j];
-        if((it.tag==='police'||it.tag==='opps')&&!it.stunned){
-          if(b.x>it.x&&b.x<it.x+it.w&&b.y>it.y-it.h&&b.y<it.y){
-            // Hit!
-            it.stunned=true; it.stunTimer=200;
-            burst(it.x+18,it.y-24,'#ffcc00',10);
-            addFloat('HEADSHOT! 💥',it.x-10,it.y-60);
-            score+=50;
-            bullets.splice(i,1); hit=true; break;
-          }
-        }
-      }
-      if(hit) continue;
-
-      // Check hit on boss
-      if(boss&&b.x>boss.x&&b.x<boss.x+boss.w&&b.y>boss.y&&b.y<boss.y+boss.h){
-        bossDealDamage();
-        bullets.splice(i,1);
-        continue;
-      }
-    }
-  }
-
-  // ── UPDATE ────────────────────────────────────────────
-  function update(){
-    if(gs!=='playing') return;
-    fN++;
-    
-    // Speed ramps up over time — every 20 seconds (1200 frames at 60fps)
-    spd=4.5+Math.min(fN/1400,1)*8; // goes from 4.5 up to 12.5 over ~23 seconds
-    // Also add a gentle step ramp
-    if(fN%500===0) spd=Math.min(13,spd+0.3);
-    
-    // Charger speed boost
-    var speedMul=P.inCharger?1.6:1;
-    bgX+=spd*speedMul;
-
-    // Score
-    var smul=P.inCharger?5:1;
-    if(boss) smul*=1.5; // 50% bonus score during boss fight
-    if(negFx==='opps') score=Math.max(0,score-spd*.1);
-    else score+=smul*spd*.055;
-    if(score>hi) hi=score;
-
-    // Physics
-    P.vy+=0.82;
-    var prevY=P.y;
-    P.y+=P.vy;
-    P.onGround=false;
-
-    // Platform landing
-    for(var i=0;i<items.length;i++){
-      var it=items[i];
-      if(it.tag!=='platform') continue;
-      var surf=platLand(it);
-      if(surf!==null&&P.vy>=0){
-        P.y=surf;
-        P.vy=0;
-        P.onGround=true;
-        break;
-      }
-      // Head bump (player jumps into bottom of platform)
-      if(P.vy<0 &&
-         P.x+P.w-4>it.x && P.x+4<it.x+it.pw &&
-         P.y-P.h<it.y+it.ph && P.y-P.h+8>it.y){
-        P.vy=Math.abs(P.vy)+0.5; // bounce downward
-      }
-    }
-
-    // Ground landing
-    if(P.y>=FLOOR){ P.y=FLOOR; P.vy=0; P.onGround=true; }
-
-    // Jump buffer logic
-    if(P.jumpBuffer>0){
-      P.vy=-17;
-      P.onGround=false;
-      P.jumpBuffer=0;
-    }
-    if(P.onGround) P.jumpBuffer=0;
-    else P.jumpBuffer=Math.max(0,P.jumpBuffer-1);
-
-    // Horizontal movement - always scrolling right
-    P.x+=spd*speedMul;
-    P.rt+=spd; // animation counter
-
-    // Left boundary: can't go too far left
-    if(P.x<80) P.x=80;
-    // Right boundary: die if too far right (falls off screen)
-    if(P.x>W+50){ gs='dead'; }
-
-    // ── ITEM UPDATE ───────────────────────────────────────────
-    for(var i=items.length-1;i>=0;i--){
-      var it=items[i];
-      it.x-=spd*speedMul;
-      if(it.tag==='platform'){
-        // Platforms off-left edge
-        if(it.x+it.w<0){ items.splice(i,1); continue; }
-      } else {
-        // Check if off-left edge
-        if(it.x+it.w<-50){ items.splice(i,1); continue; }
-
-        // Stun timer
-        if(it.stunned){
-          it.stunTimer--;
-          if(it.stunTimer<=0) it.stunned=false;
-        }
-
-        // Pick up / collision
-        if(!it.stunned&&boxCollide(P.x+4,P.y-P.h,P.w-8,P.h, it.x,it.y-it.h,it.w,it.h)){
-          items.splice(i,1);
-          handlePickup(it.kind);
-          continue;
-        }
-
-        // Police/Opps chasing & attacking
-        if(!it.stunned&&(it.tag==='police'||it.tag==='opps')){
-          var chaseDir = P.x > it.x ? 1 : -1;
-          it.x += chaseDir*spd*.35;
-          // Check if touching player
-          if(boxCollide(P.x+4,P.y-P.h,P.w-8,P.h, it.x,it.y-it.h,it.w,it.h)){
-            if(it.tag==='police'){
-              // Slows player (doesn't remove)
-              P.x -= spd*.3;
-              if(negFx!=='policeChase'){ negFx='policeChase'; negT=180; }
-              else { negT=Math.min(200,negT+60); }
-            } else if(it.tag==='opps'){
-              // Damage score
-              score=Math.max(0,score-spd*1.5);
-              negFx='opps'; negT=180;
-              // Knockback player left
-              P.x-=5;
-              items.splice(i,1);
-              burst(P.x,P.y-P.h,'#ff0000',15);
-              deathCause='enemy';
-              addFloat('💀 REKT!',P.x-20,P.y-80,true);
-            }
-            continue;
-          }
-        }
-
-        // Negative effects - apply slowdown or score impact
-        if(!it.stunned&&(it.tag==='neg')){
-          if(boxCollide(P.x+4,P.y-P.h,P.w-8,P.h, it.x,it.y-it.h,it.w,it.h)){
-            negFx=it.kind;
-            negT=200;
-            items.splice(i,1);
-            burst(it.x,it.y-it.h,'#ff0000',12);
-            if(negFx==='gentrification') score=Math.floor(score/2);
-            continue;
-          }
-        }
-      }
-    }
-
-    // Spawn new items
-    if(Math.random()<spd/120) spawnItem();
-
-    // Powerup timers
-    if(powerup){
-      puT--;
-      if(puT<=0) powerup=null;
-    }
-
-    // Negative effect timers
-    if(negFx){
-      negT--;
-      if(negT<=0){
-        negFx=null;
-        if(deathCause==='boss'){
-          // Player got hit by boss - game over
-          gs='dead';
-        }
-      }
-    }
-
-    // Apply negative effects
-    if(negFx==='childsupport'){ spd=Math.max(2.5,spd-0.08); }
-    if(negFx==='policeChase'){ spd=Math.max(3,spd-0.1); }
-    if(negFx==='opps'){ spd=Math.max(2,spd-0.15); }
-
-    // Boss spawn logic
-    if(fN>300&&!boss&&!bossDefeated&&Math.random()<0.0005*Math.pow(1.001,fN)){
-      spawnBoss();
-      bossSpawnTimer=0;
-    }
-
-    // Boss logic
-    if(boss){
-      boss.invulnTimer=Math.max(0,boss.invulnTimer-1);
-      boss.attackTimer++;
-      // Boss tracks player
-      var bossChaseDir = P.x > boss.x ? 1 : -1;
-      boss.x += bossChaseDir*spd*.15;
-      // Boss attacks every ~120 frames
-      if(boss.attackTimer>120){
-        boss.attackTimer=0;
-        // Fire 3 projectiles
-        for(var p=0;p<3;p++){
-          var angle = (Math.PI/4) - (p*Math.PI/8) + (Math.random()-0.5)*0.3;
-          bossProjectiles.push({
-            x:boss.x+40, y:boss.y+30,
-            vx:Math.cos(angle)*6, vy:Math.sin(angle)*6,
-            life:200
-          });
-        }
-      }
-
-      // Update boss projectiles
-      for(var j=bossProjectiles.length-1;j>=0;j--){
-        var bp=bossProjectiles[j];
-        bp.x+=bp.vx;
-        bp.y+=bp.vy;
-        bp.life--;
-        if(bp.life<=0){ bossProjectiles.splice(j,1); continue; }
-
-        // Check hit on player
-        if(boxCollide(P.x+4,P.y-P.h,P.w-8,P.h, bp.x-8,bp.y-8,16,16)){
-          if(!P.invincible){
-            score=Math.max(0,score-300);
-            deathCause='boss';
-            negFx='boss'; negT=30;
-            burst(P.x,P.y-P.h,'#ff6600',20);
-            addFloat('💣 BOSS HIT!',P.x-30,P.y-80,true);
-          } else {
-            // Invincible - reflect or deflect
-            bossProjectiles.splice(j,1);
-          }
-        }
-      }
-
-      // Boss left/right edge constraint
-      if(boss.x<120) boss.x=120;
-      if(boss.x>W-100) boss.x=W-100;
-
-      // Check if boss fell off
-      if(boss.y>FLOOR){ boss=null; bossDefeated=true; addFloat('BOSS ESCAPED!',W/2-50,H/2); }
-    }
-
-    updateBullets();
-  }
-
-  // ── HANDLE PICKUP ─────────────────────────────────────
-  function handlePickup(kind){
-    switch(kind){
-      case 'chicken':
-        score+=150;
-        addFloat('+150',P.x,P.y-80);
-        burst(P.x,P.y-P.h,'#ffaa00',8);
-        break;
-      case 'watermelon':
-        score+=500;
-        addFloat('+500 BOMB!',P.x-20,P.y-80);
-        burst(P.x,P.y-P.h,'#ff00ff',20);
-        break;
-      case 'koolaid':
-        powerup='koolaid';
-        puT=480; // 8 seconds
-        P.invincible=true;
-        addFloat('INVINCIBLE!',P.x-30,P.y-80);
-        burst(P.x,P.y-P.h,'#cc00ff',15);
-        break;
-      case 'ammo':
-        P.ammo=Math.min(15,P.ammo+5);
-        addFloat('+5 AMMO',P.x-10,P.y-80);
-        burst(P.x,P.y-P.h,'#ffff00',6);
-        break;
-      case 'charger':
-        powerup='charger';
-        puT=300; // 5 seconds
-        P.inCharger=true;
-        addFloat('CHARGER!',P.x-25,P.y-80);
-        burst(P.x,P.y-P.h,'#ff6600',25);
-        break;
-    }
-  }
-
-  // ── DRAW ──────────────────────────────────────────────
   function draw(){
+    ctx.clearRect(0,0,W,H);
     drawBg();
-
-    // Items
     for(var i=0;i<items.length;i++) drawItem(items[i]);
-
-    // Player
-    drawPlayer();
-
-    // Boss
-    drawBoss();
-
-    // Bullets
     drawBullets();
-
-    // Particles
+    drawPlayer();
+    drawBoss();
     drawParts();
     drawFloats();
     drawFlash();
-    drawHint();
   }
 
-  // ── GAME OVER ─────────────────────────────────────────
-  function showGameOver(){
-    var ov=document.getElementById('overlay');
-    ov.style.display='flex';
-    ov.querySelector('h1').textContent='💀 GAME OVER 💀';
-    var cause='';
-    if(deathCause==='boss') cause=' (Boss got you!)';
-    else if(deathCause==='enemy') cause=' (Opps got you!)';
-    else cause=' (Fell off the map!)';
-    ov.querySelector('.sub').textContent='Final Run'+cause;
-    document.getElementById('finalScore').textContent='FINAL SCORE: '+Math.floor(score)+' | BEST: '+Math.floor(hi);
-    document.getElementById('finalScore').style.display='block';
-    document.getElementById('startBtn').textContent='TRY AGAIN! 🥛';
-    bossMusicEl.pause();
-    audioEl.pause();
-  }
-
-  // ── MAIN LOOP ─────────────────────────────────────────
-  function loop(){
+  function gameLoop(){
     update();
-    if(gs==='dead'){ showGameOver(); gs='menu'; }
     draw();
     updateHUD();
-    requestAnimationFrame(loop);
+    requestAnimationFrame(gameLoop);
   }
 
-  loop();
+  gameLoop();
 })();
 </script>
 </body>
